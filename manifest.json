@@ -1,0 +1,16 @@
+{
+  "name": "OpenHarness Figma Bridge",
+  "id": "openharness-figma-bridge",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "devAllowedDomains": [
+      "http://localhost:8768",
+      "ws://localhost:8767"
+    ]
+  }
+}

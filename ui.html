@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 12px; margin: 0; background: #1a1a2e; color: #eee; }
+    .status { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; font-weight: 500; text-align: center; }
+    .off { background: #333; color: #999; }
+    .online { background: #4CAF50; color: white; }
+    .error { background: #f44336; color: white; }
+    .result { background: #222; border-radius: 6px; padding: 8px; font-family: monospace; font-size: 10px; max-height: 140px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .result.success { color: #4CAF50; }
+    .result.error { color: #f44336; }
+    .copy-btn { width: 100%; padding: 8px; margin-top: 8px; background: #333; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .copy-btn:hover { background: #444; }
+    .read-btn { width: 100%; padding: 8px; margin-bottom: 8px; background: #2196F3; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .read-btn:hover { background: #1976D2; }
+  </style>
+</head>
+<body>
+  <div id="status" class="status off">Bridge: Connecting...</div>
+  <button id="readBtn" class="read-btn">📤 读取选中</button>
+  <div id="output" class="result success">等待结果...</div>
+  <button id="copyBtn" class="copy-btn">📋 复制输出</button>
+
+  <script>
+    var ws = null;
+    var pendingId = null;
+    var resultData = null;
+
+    function log(msg) {
+        console.log('[ui.html]', msg);
+    }
+
+    function connect() {
+        log('Connecting to ws://localhost:8767');
+        ws = new WebSocket('ws://localhost:8767');
+        
+        ws.onopen = function() {
+            log('WebSocket connected, registering as ui');
+            ws.send(JSON.stringify({ client: 'ui', type: 'register' }));
+        };
+        
+        ws.onmessage = function(e) {
+            log('WS received: ' + e.data.substring(0, 100));
+            var data = e.data;
+            try {
+                var msg = JSON.parse(data);
+                if (msg.type === 'connected') {
+                    document.getElementById('status').className = 'status online';
+                    document.getElementById('status').textContent = 'Bridge: Online';
+                    return;
+                }
+            } catch (err) {
+                log('Parse connected error: ' + err);
+            }
+            if (data === 'pong') return;
+            try {
+                var msg = JSON.parse(data);
+                log('Message type: ' + msg.type + ', id: ' + msg.id);
+                if (msg.type === 'execute') {
+                    pendingId = msg.id;
+                    log('Forwarding execute to code.js, code: ' + (msg.code || '').substring(0, 30));
+                    parent.postMessage({ pluginMessage: msg }, '*');
+                } else if (msg.type === 'read') {
+                    pendingId = msg.id;
+                    parent.postMessage({ pluginMessage: { type: 'readSelection', requestId: msg.id } }, '*');
+                }
+            } catch (err) {
+                log('Parse error: ' + err);
+            }
+        };
+        
+        ws.onclose = function() {
+            log('WebSocket closed');
+            document.getElementById('status').className = 'status off';
+            document.getElementById('status').textContent = 'Bridge: Off';
+            setTimeout(connect, 2000);
+        };
+        
+        ws.onerror = function(e) {
+            log('WebSocket error');
+            document.getElementById('status').className = 'status error';
+            document.getElementById('status').textContent = 'Bridge: Error';
+        };
+    }
+    
+    connect();
+    
+    document.getElementById('readBtn').onclick = function() {
+        log('Read button clicked');
+        parent.postMessage({ pluginMessage: { type: 'readSelection' } }, '*');
+    };
+    
+    document.getElementById('copyBtn').onclick = function() {
+        var text = document.getElementById('output').textContent;
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('已复制!');
+    };
+    
+    window.onmessage = function(e) {
+        var msg = e.data && e.data.pluginMessage;
+        if (!msg) return;
+        
+        log('Received from code.js: ' + JSON.stringify(msg).substring(0, 100));
+        
+        var outputEl = document.getElementById('output');
+        
+        if (msg.type === 'result') {
+            if (msg.error) {
+                outputEl.textContent = 'ERROR: ' + msg.error;
+                outputEl.className = 'result error';
+                resultData = 'ERROR: ' + msg.error;
+            } else {
+                outputEl.textContent = msg.data;
+                outputEl.className = 'result success';
+                resultData = msg.data;
+                log('Result set: ' + msg.data);
+            }
+            
+            if (ws && ws.readyState === 1 && pendingId) {
+                log('Sending response back with id: ' + pendingId);
+                ws.send(JSON.stringify({ type: 'response', id: pendingId, result: resultData }));
+                pendingId = null;
+            } else {
+                log('Cannot send response: ws=' + (ws ? ws.readyState : 'null') + ' pendingId=' + pendingId);
+            }
+        } else if (msg.type === 'readResult') {
+            var readData = msg.error ? msg.error : JSON.stringify(msg.data, null, 2);
+            if (msg.error) {
+                outputEl.textContent = msg.error;
+                outputEl.className = 'result error';
+                resultData = msg.error;
+            } else {
+                outputEl.textContent = readData;
+                outputEl.className = 'result success';
+                resultData = JSON.stringify(msg.data);
+            }
+            
+            if (ws && ws.readyState === 1 && msg.requestId) {
+                ws.send(JSON.stringify({ type: 'response', id: msg.requestId, result: resultData }));
+            }
+        }
+    };
+  </script>
+</body>
+</html>

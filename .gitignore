@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.DS_Store
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+scripts-temp/
+bridge_client.py
