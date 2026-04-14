@@ -1,0 +1,52 @@
+schema:
+  name: component
+  version: 1.0.0
+  fields:
+    required:
+      - id
+      - type
+      - name
+      - hierarchy
+      - autoLayout
+      - componentSemantics
+      - tokens
+    hierarchy:
+      childCount: integer
+      children: component[]
+    autoLayout:
+      enabled: boolean
+      direction: [NONE, HORIZONTAL, VERTICAL]
+      alignment9:
+        - TOP_LEFT
+        - TOP_CENTER
+        - TOP_RIGHT
+        - CENTER_LEFT
+        - CENTER_CENTER
+        - CENTER_RIGHT
+        - BOTTOM_LEFT
+        - BOTTOM_CENTER
+        - BOTTOM_RIGHT
+      spacing: number
+      padding:
+        top: number
+        right: number
+        bottom: number
+        left: number
+    componentSemantics:
+      component: boolean
+      variant: boolean
+      instance: boolean
+      reference: string|null
+      variantProperties: object|null
+    tokens:
+      color: string[]
+      typography: string[]
+      effect: string[]
+rules:
+  ignore_fields:
+    - x
+    - y
+    - export
+    - non_design_metadata
+  fidelity:
+    no_loss_design_semantics: true

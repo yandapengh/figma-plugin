@@ -38,3 +38,4 @@
 - [api-patterns](tooling/api-patterns.md) — Figma API 命令模式和模板
 - [common-errors](tooling/common-errors.md) — 已知错误和解决方案
 - [variables](tooling/variables.md) — Variables 变量绑定方法
+- [migration-plan-schema-driven](tooling/migration-plan-schema-driven.md) — Grab 从 legacy 到 schema-driven 迁移方案

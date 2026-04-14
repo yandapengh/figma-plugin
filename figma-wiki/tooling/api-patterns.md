@@ -198,3 +198,12 @@ detached.name = 'Modified Form-Item';
 
 - [bridge.md](bridge.md) — 桥接系统架构
 - [common-errors.md](common-errors.md) — 已知错误
+
+## Schema-Driven 抽取约束（新增）
+
+读取节点时应优先使用语义字段而非几何坐标：
+
+- 必须：`hierarchy`, `autoLayout`, `componentSemantics`, `tokens`
+- 忽略：`x`, `y`, `export`, 非设计元数据
+
+建议流程：`read() -> normalize -> schema validate -> rule validate -> decision gate`
