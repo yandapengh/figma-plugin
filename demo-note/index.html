@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Floating Note Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <main class="workspace">
+        <header class="workspace-header">
+          <h1>Mock Canvas</h1>
+          <p>点击节点切换选区，验证浮动便签交互。</p>
+        </header>
+
+        <section class="node-grid" id="nodeGrid">
+          <button class="node-card" data-node-id="node-button-001" data-node-name="Button/Primary">Button / Primary</button>
+          <button class="node-card" data-node-id="node-table-001" data-node-name="Table/SearchTable">Table / SearchTable</button>
+          <button class="node-card" data-node-id="node-searchbar-001" data-node-name="SearchBar/Default">SearchBar / Default</button>
+        </section>
+      </main>
+
+      <aside class="inspector-placeholder">
+        <h2>Figma 属性栏占位区</h2>
+        <p>浮动便签不可覆盖此区域。</p>
+      </aside>
+    </div>
+
+    <section class="debug-panel">
+      <h3>调试日志</h3>
+      <ul id="debugLog"></ul>
+    </section>
+
+    <button id="noteLauncher" class="note-launcher hidden" aria-label="打开 Note 面板">📝</button>
+
+    <section id="notePanel" class="note-panel" role="dialog" aria-label="Floating Note">
+      <header id="noteHeader" class="note-header">
+        <div class="title-wrap">
+          <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+          <div>
+            <strong>Floating Note</strong>
+            <p id="selectedNodeLabel" class="selected-label">未选中节点</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="collapseBtn" title="折叠">▁</button>
+          <button id="minimizeBtn" title="最小化">—</button>
+          <button id="closeBtn" title="关闭到入口">✕</button>
+        </div>
+      </header>
+
+      <div id="noteContent" class="note-content">
+        <label>
+          note.name
+          <input id="fieldName" type="text" placeholder="输入 Note 名称" />
+        </label>
+
+        <label>
+          note.kind
+          <select id="fieldKind">
+            <option value="page">page</option>
+            <option value="component">component</option>
+            <option value="token">token</option>
+          </select>
+        </label>
+
+        <label>
+          note.intent
+          <textarea id="fieldIntent" rows="4" placeholder="描述设计意图"></textarea>
+        </label>
+
+        <label>
+          note.system_status
+          <select id="fieldStatus">
+            <option value="draft">draft</option>
+            <option value="validated">validated</option>
+            <option value="verified">verified</option>
+            <option value="deprecated">deprecated</option>
+          </select>
+        </label>
+
+        <p id="saveStatus" class="save-status">未保存</p>
+      </div>
+
+      <div id="resizeHandle" class="resize-handle" aria-hidden="true"></div>
+    </section>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
