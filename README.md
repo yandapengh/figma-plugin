@@ -247,3 +247,28 @@ assembly.md  → 组装指南
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## Design Memory OS（Schema-Driven）迁移说明（2026-04）
+
+### 新增目标
+
+- 抽取改为 **Schema 驱动**，禁止 grab 硬编码字段。
+- 输出结构统一为 `memory-node@1.0.0`，默认忽略 `x/y/export` 等非设计语义字段。
+- 写入 wiki 前必须通过验证并经用户确认。
+
+### 迁移阶段
+
+1. **Dual Output**：读取后同时保留 legacy 输出与 schema 输出用于对比。
+2. **Validation Gate**：接入 schema/rule/generation/diff/semantic 五层校验。
+3. **Human Approval**：仅在验证通过且用户确认后写入 wiki。
+4. **Cutover**：默认走 schema 输出，legacy 仅保留兼容读取。
+
+### 新增目录
+
+- `memory_os/schemas/`：可执行 schema（DSL）
+- `memory_os/extractor.py`：schema-driven 抽取骨架
+- `memory_os/validation.py`：验证管线骨架
+- `memory_os/decision_gate.py`：人工决策门控
+- `bridge_client.py`：Python 客户端（send/read/status）

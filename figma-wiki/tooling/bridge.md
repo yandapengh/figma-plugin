@@ -43,3 +43,36 @@ read()                                     # 读取选中节点
 
 - [api-patterns.md](api-patterns.md) — Figma API 常用模式
 - [common-errors.md](common-errors.md) — 已知错误和解决方案
+
+## 2026-04 协议升级（Schema-Driven）
+
+### 请求模型
+
+- 旧模型：单 `pendingRequest`
+- 新模型：`Map<requestId, requestContext>`，支持并发请求与独立超时。
+
+### 结构化错误
+
+统一错误格式：
+
+```json
+{
+  "error": {
+    "code": "offline|timeout|protocol_error",
+    "message": "...",
+    "requestId": 123,
+    "requestType": "read|execute"
+  }
+}
+```
+
+### read 输出契约
+
+`code.js` 读取返回 `memory-node@1.0.0`，核心字段：
+
+- hierarchy（树层级）
+- autoLayout（direction/alignment9/padding/spacing）
+- componentSemantics（component/variant/instance/reference）
+- tokens（color/typography/effect）
+
+忽略字段：`x/y/export/non_design_metadata`
