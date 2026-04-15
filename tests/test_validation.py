@@ -32,6 +32,81 @@ class ValidationPipelineTests(unittest.TestCase):
         errors = write_payload_validation(payload)
         self.assertIn("write:node_link_missing_nodeId:0", errors)
 
+    def test_additive_structure_change_passes(self):
+        previous = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1", "name": "Button"}]}
+        current = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1", "name": "Button"}, {"id": "n2", "name": "Icon"}],
+        }
+
+        result = validate_pipeline(current, previous_memory=previous)
+
+        self.assertTrue(result["pass"])
+        self.assertEqual([], result["structure_change_errors"])
+        self.assertIn("additive", result["structure_change_types"])
+
+    def test_move_rename_delete_blocked_by_default(self):
+        previous = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [
+                {"id": "n1", "name": "Button", "parentId": "root"},
+                {"id": "n2", "name": "Text", "parentId": "root"},
+                {"id": "n3", "name": "Icon", "parentId": "root"},
+            ],
+        }
+        current = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [
+                {"id": "n1", "name": "Button/Primary", "parentId": "root"},
+                {"id": "n2", "name": "Text", "parentId": "panel"},
+            ],
+        }
+
+        result = validate_pipeline(current, previous_memory=previous)
+
+        self.assertFalse(result["pass"])
+        self.assertIn("structure:blocked:move", result["structure_change_errors"])
+        self.assertIn("structure:blocked:rename", result["structure_change_errors"])
+        self.assertIn("structure:blocked:delete", result["structure_change_errors"])
+
+    def test_restructure_blocked_by_default(self):
+        previous = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1", "name": "Board"}]}
+        current = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1", "name": "Board", "restructure": True}],
+        }
+
+        result = validate_pipeline(current, previous_memory=previous)
+
+        self.assertFalse(result["pass"])
+        self.assertIn("restructure", result["structure_change_types"])
+        self.assertIn("structure:blocked:restructure", result["structure_change_errors"])
+
+    def test_restructure_allowed_only_with_mode_and_confirmation(self):
+        previous = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1", "name": "Board"}]}
+        current = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1", "name": "Board", "restructure": True}],
+        }
+
+        result_without_confirmation = validate_pipeline(
+            current,
+            previous_memory=previous,
+            restructure_mode=True,
+            restructure_confirmed=False,
+        )
+        self.assertFalse(result_without_confirmation["pass"])
+        self.assertIn("structure:blocked:restructure", result_without_confirmation["structure_change_errors"])
+
+        result_with_confirmation = validate_pipeline(
+            current,
+            previous_memory=previous,
+            restructure_mode=True,
+            restructure_confirmed=True,
+        )
+        self.assertTrue(result_with_confirmation["pass"])
+        self.assertEqual([], result_with_confirmation["structure_change_errors"])
+
 
 if __name__ == "__main__":
     unittest.main()
