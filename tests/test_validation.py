@@ -39,6 +39,9 @@ class ValidationPipelineTests(unittest.TestCase):
             "nodes": [{"id": "n1", "name": "Button"}, {"id": "n2", "name": "Icon"}],
         }
         result = validate_pipeline(current, previous_memory=previous)
+
+        result = validate_pipeline(current, previous_memory=previous)
+
         self.assertTrue(result["pass"])
         self.assertEqual([], result["structure_change_errors"])
         self.assertIn("additive", result["structure_change_types"])
