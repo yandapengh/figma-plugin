@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 MODE = "annotation_user_controlled_minimal_gate@1.0.0"
 VALID_AUTO_LAYOUT_DIRECTIONS = {"HORIZONTAL", "VERTICAL"}
 NODE_LINKED_MAPPING_KEY = "nodeId"
+VALID_STRUCTURE_CHANGE_TYPES = {"additive", "move", "rename", "delete", "restructure"}
+DEFAULT_ALLOWED_STRUCTURE_CHANGE_TYPES = {"additive"}
 
 
 def _is_json_serializable(payload: Any) -> bool:
@@ -104,17 +106,89 @@ def write_payload_validation(write_payload: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _extract_structure_change_types(payload: Dict[str, Any]) -> List[str]:
+    """Extract declared structure change types from payload, defaulting to additive."""
+
+    collected: List[str] = []
+
+    single = payload.get("structure_change_type", payload.get("structureChangeType"))
+    if isinstance(single, str) and single.strip():
+        collected.append(single.strip().lower())
+
+    changes = payload.get("structure_changes", payload.get("structureChanges"))
+    if isinstance(changes, list):
+        for item in changes:
+            if isinstance(item, str) and item.strip():
+                collected.append(item.strip().lower())
+                continue
+
+            if isinstance(item, dict):
+                change_type = item.get("type")
+                if isinstance(change_type, str) and change_type.strip():
+                    collected.append(change_type.strip().lower())
+
+    if not collected:
+        return ["additive"]
+
+    deduped: List[str] = []
+    seen = set()
+    for value in collected:
+        if value not in seen:
+            seen.add(value)
+            deduped.append(value)
+    return deduped
+
+
+def validate_structure_changes(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate structural mutations. Default policy blocks non-additive changes.
+
+    To allow restructure explicitly, payload must include:
+    - restructure_mode = True
+    - restructure_confirmed = True
+    """
+
+    detected_types = _extract_structure_change_types(payload)
+    errors: List[str] = []
+
+    allow_restructure = bool(payload.get("restructure_mode"))
+    restructure_confirmed = bool(payload.get("restructure_confirmed"))
+
+    for change_type in detected_types:
+        if change_type not in VALID_STRUCTURE_CHANGE_TYPES:
+            errors.append(f"struct:unknown_change_type:{change_type}")
+            continue
+
+        if change_type in DEFAULT_ALLOWED_STRUCTURE_CHANGE_TYPES:
+            continue
+
+        if change_type == "restructure" and allow_restructure and restructure_confirmed:
+            continue
+
+        errors.append(f"struct:blocked_change_type:{change_type}")
+
+    return {
+        "structure_change_types": detected_types,
+        "structure_change_errors": errors,
+    }
+
+
 def validate_pipeline(memory: Dict[str, Any], write_payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     schema_errors = validate_schema(memory)
     rule_warnings = validate_rules(memory)
 
     payload = write_payload if isinstance(write_payload, dict) else memory
     write_errors = write_payload_validation(payload)
+    structure_result = validate_structure_changes(payload)
+    structure_change_errors = structure_result["structure_change_errors"]
+    structure_change_types = structure_result["structure_change_types"]
 
     return {
-        "pass": len(schema_errors) == 0 and len(write_errors) == 0,
+        "pass": len(schema_errors) == 0 and len(write_errors) == 0 and len(structure_change_errors) == 0,
         "schema_errors": schema_errors,
         "rule_warnings": rule_warnings,
         "write_errors": write_errors,
+        "structure_change_types": structure_change_types,
+        "structure_change_errors": structure_change_errors,
         "mode": MODE,
     }

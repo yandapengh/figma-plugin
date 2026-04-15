@@ -32,6 +32,53 @@ class ValidationPipelineTests(unittest.TestCase):
         errors = write_payload_validation(payload)
         self.assertIn("write:node_link_missing_nodeId:0", errors)
 
+    def test_additive_structure_change_passes(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "structure_changes": [{"type": "additive"}],
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertTrue(result["pass"])
+        self.assertEqual([], result["structure_change_errors"])
+        self.assertIn("additive", result["structure_change_types"])
+
+    def test_move_change_is_blocked_by_default(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "structure_change_type": "move",
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertFalse(result["pass"])
+        self.assertIn("struct:blocked_change_type:move", result["structure_change_errors"])
+
+    def test_restructure_blocked_without_explicit_mode(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "structure_change_type": "restructure",
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertFalse(result["pass"])
+        self.assertIn("struct:blocked_change_type:restructure", result["structure_change_errors"])
+
+    def test_restructure_allowed_with_mode_and_confirmation(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "structure_change_type": "restructure",
+            "restructure_mode": True,
+            "restructure_confirmed": True,
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertTrue(result["pass"])
+        self.assertEqual([], result["structure_change_errors"])
+
 
 if __name__ == "__main__":
     unittest.main()
