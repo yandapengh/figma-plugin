@@ -66,6 +66,24 @@ class WikiRouterTests(unittest.TestCase):
                 existing_paths=["components/button"],
             )
 
+    def test_not_create_new_returns_no_route_decision(self):
+        router = WikiRouter(
+            category_tree_markdown=self.index_markdown,
+            content_summary="实验性内容，不落入现有分类",
+            recommendations=["components/card"],
+        )
+
+        router.submit_answer("S1.select_position", {"selected_path": "not_matched", "rationale": "暂无匹配"})
+        pending = router.submit_answer("S2.create_new_category", {"create_new": False})
+        self.assertFalse(pending.done)
+        self.assertEqual("S4.confirm", pending.question.question_id)
+
+        result = router.submit_answer("S4.confirm", {"user_confirmed": True, "rationale": "暂不写入"})
+        self.assertTrue(result.done)
+        self.assertEqual("no_route", result.route["route_mode"])
+        self.assertIsNone(result.route["selected_path"])
+        self.assertTrue(result.route["user_confirmed"])
+
     def test_prepare_wiki_write_pending(self):
         payload = build_decision_payload("new_page", {"component": {}}, {"wiki_index": ["components"]})
         routed = prepare_wiki_write(payload, None)

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-ROUTE_MODES = {"existing", "new_under_existing", "new_top_level"}
+ROUTE_MODES = {"existing", "new_under_existing", "new_top_level", "no_route"}
 INVALID_CATEGORY_CHARS = re.compile(r"[\\/:*?\"<>|]")
 PATH_REPEATED_SLASH = re.compile(r"//+")
 
@@ -142,7 +142,7 @@ class WikiRouter:
             raise WikiRouterError("create_new must be true/false")
 
         if not create_new:
-            self.answers["route_mode"] = "existing"
+            self.answers["route_mode"] = "no_route"
             self.answers["selected_path"] = None
             self.answers.setdefault("rationale", "no_category_confirmed")
             self.state = "S4"
@@ -287,6 +287,13 @@ def validate_route_decision(decision: Dict[str, Any], existing_paths: Optional[L
             raise WikiRouterError("selected_path is required when route_mode=existing")
         normalize_path(decision["selected_path"])
 
+    if mode == "no_route":
+        selected = decision.get("selected_path")
+        if selected:
+            normalize_path(selected)
+        if decision.get("user_confirmed") not in {True, False}:
+            raise WikiRouterError("user_confirmed must be true/false when route_mode=no_route")
+
     if mode == "new_under_existing":
         if not decision.get("parent_path"):
             raise WikiRouterError("parent_path is required when route_mode=new_under_existing")
@@ -299,4 +306,3 @@ def validate_route_decision(decision: Dict[str, Any], existing_paths: Optional[L
 
     if mode == "new_top_level":
         _validate_category_name(decision.get("new_category_name"), existing_paths=existing_paths or [])
-
