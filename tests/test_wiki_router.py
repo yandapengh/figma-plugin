@@ -1,6 +1,6 @@
 import unittest
 
-from memory_os.decision_gate import build_decision_payload, prepare_wiki_write
+from memory_os.decision_gate import build_decision_payload, can_persist, prepare_wiki_write
 from memory_os.wiki_router import WikiRouter, WikiRouterError, validate_route_decision
 
 
@@ -102,6 +102,59 @@ class WikiRouterTests(unittest.TestCase):
         self.assertEqual("ready", confirmed["write_status"])
         self.assertTrue(confirmed["write_allowed"])
         self.assertEqual("components/button", confirmed["wiki_target_selected"])
+
+    def test_route_modes_confirmed_behavior_consistent(self):
+        payload = build_decision_payload("new_page", {"component": {}}, {"wiki_index": ["components"]})
+        routes = [
+            {
+                "route_mode": "existing",
+                "selected_path": "components/button",
+                "user_confirmed": True,
+            },
+            {
+                "route_mode": "new_under_existing",
+                "parent_path": "components",
+                "new_category_name": "badge",
+                "user_confirmed": True,
+            },
+            {
+                "route_mode": "new_top_level",
+                "new_category_name": "guidelines",
+                "user_confirmed": True,
+            },
+        ]
+
+        for route in routes:
+            with self.subTest(route_mode=route["route_mode"]):
+                prepared = prepare_wiki_write(payload, route)
+                self.assertTrue(prepared["write_allowed"])
+                self.assertEqual("ready", prepared["write_status"])
+                self.assertTrue(can_persist("create_new", True, route_decision=route))
+
+    def test_route_rejected_when_unconfirmed_or_missing_required_fields(self):
+        payload = build_decision_payload("new_page", {"component": {}}, {"wiki_index": ["components"]})
+        routes = [
+            {"route_mode": "existing", "selected_path": "components/button", "user_confirmed": False},
+            {"route_mode": "existing", "user_confirmed": True},
+            {
+                "route_mode": "new_under_existing",
+                "new_category_name": "badge",
+                "user_confirmed": True,
+            },
+            {
+                "route_mode": "new_under_existing",
+                "parent_path": "components",
+                "user_confirmed": True,
+            },
+            {"route_mode": "new_top_level", "user_confirmed": True},
+        ]
+
+        for route in routes:
+            with self.subTest(route_mode=route["route_mode"], route=route):
+                prepared = prepare_wiki_write(payload, route)
+                self.assertFalse(prepared["write_allowed"])
+                self.assertEqual("pending_confirmation", prepared["write_status"])
+                self.assertFalse(can_persist("create_new", True, route_decision=route))
 
 
 if __name__ == "__main__":
