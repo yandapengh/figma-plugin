@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from memory_os.wiki_router import validate_route_decision
+from memory_os.wiki_router import WikiRouterError, validate_route_decision
 
 
 DEFAULT_WIKI_TARGETS = ["tokens", "components", "pages", "tooling"]
@@ -86,17 +86,37 @@ def build_decision_payload(case_type: str, delta: Dict[str, Any], validation_rep
 def can_persist(
     user_action: str,
     validation_passed: bool,
-    wiki_target_selected: Optional[str] = None,
+    route_decision: Optional[Dict[str, Any]] = None,
     requires_wiki_target_confirmation: bool = True,
 ) -> bool:
     action_confirmed = user_action in {"extend_existing", "fork_new_version", "create_new", "create_as_draft"}
     if not (validation_passed and action_confirmed):
         return False
 
-    if requires_wiki_target_confirmation and not wiki_target_selected:
+    if requires_wiki_target_confirmation and not is_route_confirmed(route_decision):
         return False
 
     return True
+
+
+def is_route_confirmed(route_decision: Optional[Dict[str, Any]]) -> bool:
+    """Check whether wiki route decision has confirmation and required fields."""
+
+    if not isinstance(route_decision, dict):
+        return False
+
+    if route_decision.get("user_confirmed") is not True:
+        return False
+
+    mode = route_decision.get("route_mode")
+    if mode == "existing":
+        return bool(route_decision.get("selected_path"))
+    if mode == "new_under_existing":
+        return bool(route_decision.get("parent_path") and route_decision.get("new_category_name"))
+    if mode == "new_top_level":
+        return bool(route_decision.get("new_category_name"))
+
+    return False
 
 
 def prepare_wiki_write(decision_payload: Dict[str, Any], wiki_route: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -111,12 +131,18 @@ def prepare_wiki_write(decision_payload: Dict[str, Any], wiki_route: Optional[Di
         result["route_decision"] = None
         return result
 
-    validate_route_decision(wiki_route)
+    try:
+        validate_route_decision(wiki_route)
+    except WikiRouterError:
+        result["route_decision"] = wiki_route
+        result["write_allowed"] = False
+        result["write_status"] = "pending_confirmation"
+        return result
 
-    user_confirmed = bool(wiki_route.get("user_confirmed"))
     result["route_decision"] = wiki_route
-    result["write_allowed"] = user_confirmed
-    result["write_status"] = "ready" if user_confirmed else "pending_confirmation"
+    route_confirmed = is_route_confirmed(wiki_route)
+    result["write_allowed"] = route_confirmed
+    result["write_status"] = "ready" if route_confirmed else "pending_confirmation"
 
     if wiki_route.get("route_mode") == "existing":
         result["wiki_target_selected"] = wiki_route.get("selected_path")
