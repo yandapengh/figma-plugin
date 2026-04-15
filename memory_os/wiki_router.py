@@ -214,17 +214,24 @@ def _parse_candidate_paths(markdown: str) -> List[str]:
 
         if line.startswith("- [") and "](" in line and current_section:
             link_target = line.split("](", 1)[1].split(")", 1)[0]
-            parts = [segment for segment in link_target.split("/") if segment and not segment.endswith(".md") and not segment.endswith(".jsx")]
-            if not parts:
+            raw_segments = [segment for segment in link_target.split("/") if segment]
+            if not raw_segments:
                 continue
-            top = _slugify(parts[0])
-            if not top:
+
+            if raw_segments[0] == "figma-wiki":
+                raw_segments = raw_segments[1:]
+            if not raw_segments:
                 continue
-            if len(parts) == 1:
-                path = top
-            else:
-                tail = _slugify(parts[1])
-                path = f"{top}/{tail}" if tail else top
+
+            if raw_segments[-1].endswith(".md") or raw_segments[-1].endswith(".jsx"):
+                raw_segments = raw_segments[:-1]
+
+            normalized_segments = [_slugify(segment) for segment in raw_segments]
+            path_segments = [segment for segment in normalized_segments if segment]
+            if not path_segments:
+                continue
+
+            path = "/".join(path_segments)
             candidates.append(path)
 
     deduped: List[str] = []

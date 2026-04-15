@@ -1,7 +1,7 @@
 import unittest
 
 from memory_os.decision_gate import build_decision_payload, can_persist, prepare_wiki_write
-from memory_os.wiki_router import WikiRouter, WikiRouterError, validate_route_decision
+from memory_os.wiki_router import WikiRouter, WikiRouterError, _parse_candidate_paths, validate_route_decision
 
 
 class WikiRouterTests(unittest.TestCase):
@@ -155,6 +155,22 @@ class WikiRouterTests(unittest.TestCase):
                 self.assertFalse(prepared["write_allowed"])
                 self.assertEqual("pending_confirmation", prepared["write_status"])
                 self.assertFalse(can_persist("create_new", True, route_decision=route))
+
+    def test_parse_candidate_paths_preserves_three_plus_directory_levels(self):
+        markdown = """
+## Pages（页面）
+- [DeepSpec](figma-wiki/pages/basic-form/advanced/validations/spec.md)
+"""
+        parsed = _parse_candidate_paths(markdown)
+        self.assertIn("pages/basic-form/advanced/validations", parsed)
+
+    def test_parse_candidate_paths_two_level_paths_no_regression(self):
+        markdown = """
+## Components（组件）
+- [Button](figma-wiki/components/Button/spec.md)
+"""
+        parsed = _parse_candidate_paths(markdown)
+        self.assertIn("components/button", parsed)
 
 
 if __name__ == "__main__":
