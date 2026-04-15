@@ -257,6 +257,8 @@ assembly.md  → 组装指南
 - 抽取改为 **Schema 驱动**，禁止 grab 硬编码字段。
 - 输出结构统一为 `memory-node@1.0.0`，默认忽略 `x/y/export` 等非设计语义字段。
 - 写入 wiki 前必须通过验证并经用户确认。
+- 用户在 Annotation 完成的业务字段筛选为唯一真源，系统只做底线校验与结构化内化，不再做二次业务筛选。
+- 校验分级：`schema_errors/write_errors` 为阻断；`rule_warnings` 为提示（默认不阻断）。node-linked 映射字段统一使用 `nodeId`。
 
 ### 迁移阶段
 

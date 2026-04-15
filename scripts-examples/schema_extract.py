@@ -9,7 +9,7 @@ if __name__ == "__main__":
     payload = read()
     nodes = payload.get("nodes", []) if isinstance(payload, dict) else []
     extracted = extract_by_schema(nodes)
-    report = validate_pipeline(extracted.structured_memory)
+    report = validate_pipeline(extracted.structured_memory, write_payload=extracted.structured_memory)
 
     print("schemaVersion:", extracted.structured_memory.get("schemaVersion"))
     print("validation:", report)
