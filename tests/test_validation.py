@@ -79,6 +79,29 @@ class ValidationPipelineTests(unittest.TestCase):
         self.assertTrue(result["pass"])
         self.assertEqual([], result["structure_change_errors"])
 
+    def test_infer_delete_change_from_payload_keys(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "deleted_nodes": ["n2"],
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertFalse(result["pass"])
+        self.assertIn("delete", result["structure_change_types"])
+        self.assertIn("struct:blocked_change_type:delete", result["structure_change_errors"])
+
+    def test_infer_additive_when_no_structure_hints(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "metadata": {"source": "manual"},
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertTrue(result["pass"])
+        self.assertEqual(["additive"], result["structure_change_types"])
+
 
 if __name__ == "__main__":
     unittest.main()

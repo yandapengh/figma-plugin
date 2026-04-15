@@ -10,6 +10,12 @@ VALID_AUTO_LAYOUT_DIRECTIONS = {"HORIZONTAL", "VERTICAL"}
 NODE_LINKED_MAPPING_KEY = "nodeId"
 VALID_STRUCTURE_CHANGE_TYPES = {"additive", "move", "rename", "delete", "restructure"}
 DEFAULT_ALLOWED_STRUCTURE_CHANGE_TYPES = {"additive"}
+STRUCTURE_HINT_KEYS = {
+    "move": {"moved_nodes", "move_ops", "move_operations"},
+    "rename": {"renamed_nodes", "rename_ops", "rename_operations"},
+    "delete": {"deleted_nodes", "delete_ops", "delete_operations"},
+    "restructure": {"restructure_plan", "restructure_ops", "restructure_operations"},
+}
 
 
 def _is_json_serializable(payload: Any) -> bool:
@@ -128,6 +134,11 @@ def _extract_structure_change_types(payload: Dict[str, Any]) -> List[str]:
                     collected.append(change_type.strip().lower())
 
     if not collected:
+        inferred = _infer_structure_change_types(payload)
+        if inferred:
+            collected.extend(inferred)
+
+    if not collected:
         return ["additive"]
 
     deduped: List[str] = []
@@ -137,6 +148,23 @@ def _extract_structure_change_types(payload: Dict[str, Any]) -> List[str]:
             seen.add(value)
             deduped.append(value)
     return deduped
+
+
+def _infer_structure_change_types(payload: Dict[str, Any]) -> List[str]:
+    """Infer structural change types from common operation keys when explicit type is missing."""
+
+    inferred: List[str] = []
+    for change_type, keys in STRUCTURE_HINT_KEYS.items():
+        for key in keys:
+            value = payload.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (list, dict, tuple, set)) and len(value) == 0:
+                continue
+            inferred.append(change_type)
+            break
+
+    return inferred
 
 
 def validate_structure_changes(payload: Dict[str, Any]) -> Dict[str, Any]:
