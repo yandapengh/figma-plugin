@@ -224,6 +224,59 @@ assembly.md  → 组装指南
 
 ---
 
+
+
+### 分类问询协议（wiki_router）
+
+在“准备写入 wiki”前，系统先执行 `memory_os/wiki_router.py` 的问询状态机，确保分类路径有明确确认：
+
+1. **S1**：请选择放入 wiki 的位置（展示候选路径 + 推荐路径）。
+2. **S2**：若用户选择“不匹配”，追问是否新建分类。
+3. **S3a/S3b**：
+   - S3a：新建并挂在现有层级下时，采集 `parent_path` 与 `new_category_name`。
+   - S3b：新建顶层时，采集 `new_category_name`（可选 `new_category_description`）。
+4. **S4**：汇总确认，只有 `user_confirmed=true` 才允许写入。
+
+统一输出契约：
+
+- `route_mode`: `existing` | `new_under_existing` | `new_top_level`
+- `selected_path`（`existing` 必填）
+- `parent_path`（`new_under_existing` 必填）
+- `new_category_name`（新建时必填）
+- `new_category_description`（可选）
+- `user_confirmed`（最终确认）
+- `rationale`（放置理由）
+
+字段轻校验（router 内完成）：
+
+- `route_mode` 与必填字段一致性。
+- 路径必须是 `a/b/c` 形式，禁止空段与重复斜杠。
+- `new_category_name` 最小合法性检查（长度、非法字符、重名提示）。
+
+**最小示例 1：命中现有分类**
+
+```json
+{
+  "route_mode": "existing",
+  "selected_path": "components/button",
+  "user_confirmed": true,
+  "rationale": "内容是按钮状态与规格补充"
+}
+```
+
+**最小示例 2：不匹配后新建子分类**
+
+```json
+{
+  "route_mode": "new_under_existing",
+  "parent_path": "components",
+  "new_category_name": "badge",
+  "new_category_description": "状态徽标组件",
+  "user_confirmed": true,
+  "rationale": "现有组件目录无 badge 规范"
+}
+```
+
 ## 声明
 
 > ⚠️ **实验性项目**

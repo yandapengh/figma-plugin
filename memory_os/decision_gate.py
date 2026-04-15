@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from memory_os.wiki_router import validate_route_decision
+
 
 DEFAULT_WIKI_TARGETS = ["tokens", "components", "pages", "tooling"]
 
@@ -95,3 +97,28 @@ def can_persist(
         return False
 
     return True
+
+
+def prepare_wiki_write(decision_payload: Dict[str, Any], wiki_route: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Attach wiki routing decision before write stage with minimal compatibility impact."""
+
+    result = dict(decision_payload)
+    result.setdefault("wiki_target_selected", None)
+
+    if not isinstance(wiki_route, dict):
+        result["write_allowed"] = False
+        result["write_status"] = "pending_confirmation"
+        result["route_decision"] = None
+        return result
+
+    validate_route_decision(wiki_route)
+
+    user_confirmed = bool(wiki_route.get("user_confirmed"))
+    result["route_decision"] = wiki_route
+    result["write_allowed"] = user_confirmed
+    result["write_status"] = "ready" if user_confirmed else "pending_confirmation"
+
+    if wiki_route.get("route_mode") == "existing":
+        result["wiki_target_selected"] = wiki_route.get("selected_path")
+
+    return result
