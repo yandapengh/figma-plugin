@@ -38,6 +38,7 @@ class ValidationPipelineTests(unittest.TestCase):
             "schemaVersion": "component@1.0.0",
             "nodes": [{"id": "n1", "name": "Button"}, {"id": "n2", "name": "Icon"}],
         }
+        result = validate_pipeline(current, previous_memory=previous)
 
         result = validate_pipeline(current, previous_memory=previous)
 
@@ -106,6 +107,41 @@ class ValidationPipelineTests(unittest.TestCase):
         )
         self.assertTrue(result_with_confirmation["pass"])
         self.assertEqual([], result_with_confirmation["structure_change_errors"])
+
+    def test_explicit_move_change_is_blocked_by_default(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "structure_change_type": "move",
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertFalse(result["pass"])
+        self.assertIn("move", result["structure_change_types"])
+        self.assertIn("structure:blocked:move", result["structure_change_errors"])
+
+    def test_infer_delete_change_from_payload_keys(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "deleted_nodes": ["n2"],
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertFalse(result["pass"])
+        self.assertIn("delete", result["structure_change_types"])
+        self.assertIn("structure:blocked:delete", result["structure_change_errors"])
+
+    def test_infer_additive_when_no_structure_hints(self):
+        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
+        payload = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1"}],
+            "metadata": {"source": "manual"},
+        }
+        result = validate_pipeline(memory, write_payload=payload)
+        self.assertTrue(result["pass"])
+        self.assertEqual(["additive"], result["structure_change_types"])
 
 
 if __name__ == "__main__":

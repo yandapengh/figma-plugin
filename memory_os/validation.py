@@ -5,6 +5,13 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional, Set
 
+from memory_os.structure_guard import (
+    detect_structure_change_type,
+    extract_structure_change_types,
+    merge_structure_change_types,
+    validate_structure_changes,
+)
+
 MODE = "annotation_user_controlled_minimal_gate@1.0.0"
 VALID_AUTO_LAYOUT_DIRECTIONS = {"HORIZONTAL", "VERTICAL"}
 NODE_LINKED_MAPPING_KEY = "nodeId"
@@ -196,6 +203,14 @@ def validate_pipeline(
 
     payload = write_payload if isinstance(write_payload, dict) else memory
     write_errors = write_payload_validation(payload)
+    explicit_types = extract_structure_change_types(payload)
+    detected_types = detect_structure_change_type(previous_memory, memory)
+    structure_change_types = merge_structure_change_types(explicit_types, detected_types)
+    structure_change_errors = validate_structure_changes(
+        structure_change_types,
+        restructure_mode=restructure_mode or bool(payload.get("restructure_mode")),
+        restructure_confirmed=restructure_confirmed or bool(payload.get("restructure_confirmed")),
+    )
 
     structure_change_types = detect_structure_change_type(previous_memory, memory)
     structure_change_errors = validate_structure_changes(
@@ -209,6 +224,8 @@ def validate_pipeline(
         "schema_errors": schema_errors,
         "rule_warnings": rule_warnings,
         "write_errors": write_errors,
+        "structure_change_types": structure_change_types,
+        "structure_change_errors": structure_change_errors,
         "structure_change_errors": structure_change_errors,
         "structure_change_types": structure_change_types,
         "mode": MODE,
