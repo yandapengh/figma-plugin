@@ -239,7 +239,7 @@ assembly.md  → 组装指南
 
 统一输出契约：
 
-- `route_mode`: `existing` | `new_under_existing` | `new_top_level`
+- `route_mode`: `existing` | `new_under_existing` | `new_top_level` | `no_route`
 - `selected_path`（`existing` 必填）
 - `parent_path`（`new_under_existing` 必填）
 - `new_category_name`（新建时必填）
@@ -277,6 +277,17 @@ assembly.md  → 组装指南
 }
 ```
 
+**最小示例 3：不写入任何分类（仅确认不落库）**
+
+```json
+{
+  "route_mode": "no_route",
+  "selected_path": null,
+  "user_confirmed": true,
+  "rationale": "当前内容为临时实验记录，暂不入库"
+}
+```
+
 ## 声明
 
 > ⚠️ **实验性项目**
@@ -311,12 +322,13 @@ assembly.md  → 组装指南
 - 输出结构统一为 `memory-node@1.0.0`，默认忽略 `x/y/export` 等非设计语义字段。
 - 写入 wiki 前必须通过验证并经用户确认。
 - 用户在 Annotation 完成的业务字段筛选为唯一真源，系统只做底线校验与结构化内化，不再做二次业务筛选。
-- 校验分级：`schema_errors/write_errors` 为阻断；`rule_warnings` 为提示（默认不阻断）。node-linked 映射字段统一使用 `nodeId`。
+- 校验分级：`schema_errors/write_errors/structure_change_errors` 为阻断；`rule_warnings` 为提示（默认不阻断）。node-linked 映射字段统一使用 `nodeId`。
+- 当前主流程已接入 `schema/rule/write/structure-change` 四层校验；`generation/diff/semantic` 处于迁移占位阶段。
 
 ### 迁移阶段
 
 1. **Dual Output**：读取后同时保留 legacy 输出与 schema 输出用于对比。
-2. **Validation Gate**：接入 schema/rule/generation/diff/semantic 五层校验。
+2. **Validation Gate**：当前接入 schema/rule/write/structure-change 四层校验，并预留 generation/diff/semantic 扩展位。
 3. **Human Approval**：仅在验证通过且用户确认后写入 wiki。
 4. **Cutover**：默认走 schema 输出，legacy 仅保留兼容读取。
 

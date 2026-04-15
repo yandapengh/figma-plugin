@@ -1,70 +1,67 @@
-"""Bridge client for schema-driven Figma extraction.
-
-Minimal compatibility layer for existing scripts:
-- send(code: str)
-- read()
-- status()
-"""
+"""Minimal Python client for OpenHarness Figma Bridge."""
 
 from __future__ import annotations
 
 import json
 from typing import Any, Dict, Optional
+from urllib import request
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 BASE_URL = "http://localhost:8768"
 
 
-class BridgeError(RuntimeError):
-    """Raised when bridge request fails."""
+class BridgeClientError(RuntimeError):
+    """Raised when bridge endpoint is unavailable or returns an error."""
 
 
-def _http_json(method: str, path: str, payload: Optional[Dict[str, Any]] = None, timeout: int = 35) -> Dict[str, Any]:
-    body = None
-    headers = {"Content-Type": "application/json"}
-    if payload is not None:
-        body = json.dumps(payload).encode("utf-8")
+def _post(path: str, payload: Dict[str, Any], timeout: int = 30) -> Dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8")
+    req = request.Request(
+        f"{BASE_URL}{path}",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    return _send(req, timeout=timeout)
 
-    request = Request(f"{BASE_URL}{path}", data=body, headers=headers, method=method)
+
+def _get(path: str, timeout: int = 10) -> Dict[str, Any]:
+    req = request.Request(f"{BASE_URL}{path}", method="GET")
+    return _send(req, timeout=timeout)
+
+
+def _send(req: request.Request, timeout: int) -> Dict[str, Any]:
     try:
-        with urlopen(request, timeout=timeout) as resp:
-            text = resp.read().decode("utf-8")
-            data = json.loads(text) if text else {}
-            if isinstance(data, dict) and "error" in data:
-                raise BridgeError(json.dumps(data, ensure_ascii=False))
-            return data
-    except HTTPError as e:
-        detail = e.read().decode("utf-8", errors="ignore")
-        raise BridgeError(detail or str(e)) from e
-    except URLError as e:
-        raise BridgeError(str(e)) from e
-
-
-def send(code: str) -> Any:
-    """Execute IIFE JavaScript in Figma plugin and return parsed result."""
-    data = _http_json("POST", "/send", {"code": code}, timeout=35)
-    result = data.get("result")
-    if isinstance(result, str):
+        with request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw) if raw else {}
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8")
         try:
-            return json.loads(result)
-        except Exception:
-            return result
-    return result
+            payload = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            payload = {"error": {"code": "http_error", "message": body or str(exc)}}
+        raise BridgeClientError(payload.get("error", {}).get("message", str(exc))) from exc
+    except URLError as exc:
+        raise BridgeClientError(f"Bridge unreachable: {exc.reason}") from exc
 
 
-def read() -> Any:
-    """Read current selection from Figma plugin and return structured payload."""
-    data = _http_json("POST", "/read", {}, timeout=15)
-    result = data.get("result")
-    if isinstance(result, str):
-        try:
-            return json.loads(result)
-        except Exception:
-            return result
-    return result
+def send(code: str, *, timeout: int = 30) -> Dict[str, Any]:
+    """Send JS code to the bridge /send endpoint."""
+    return _post("/send", {"code": code}, timeout=timeout)
 
 
-def status() -> Dict[str, Any]:
-    """Fetch bridge status."""
-    return _http_json("GET", "/status", None, timeout=5)
+def read(*, timeout: int = 10) -> Dict[str, Any]:
+    """Read current Figma selection from bridge /read endpoint."""
+    return _post("/read", {}, timeout=timeout)
+
+
+def status(*, timeout: int = 10) -> Dict[str, Any]:
+    """Check bridge connection state from /status endpoint."""
+    return _get("/status", timeout=timeout)
+
+
+def ping(*, timeout: int = 10) -> bool:
+    """Convenience helper for connection checks."""
+    state: Optional[Dict[str, Any]] = status(timeout=timeout)
+    return bool(state and state.get("connected"))

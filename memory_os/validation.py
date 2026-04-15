@@ -1,16 +1,11 @@
-"""Validation pipeline for schema/rule/write minimal gate layers."""
+"""Validation pipeline for schema/rule/write/structure minimal gate layers."""
 
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
-from memory_os.structure_guard import (
-    detect_structure_change_type,
-    extract_structure_change_types,
-    merge_structure_change_types,
-    validate_structure_changes,
-)
+from memory_os.structure_guard import detect_structure_change_type, extract_structure_change_types, merge_structure_change_types, validate_structure_changes
 
 MODE = "annotation_user_controlled_minimal_gate@1.0.0"
 VALID_AUTO_LAYOUT_DIRECTIONS = {"HORIZONTAL", "VERTICAL"}
@@ -111,67 +106,6 @@ def write_payload_validation(write_payload: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def _node_map(memory: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    nodes = memory.get("nodes", [])
-    if not isinstance(nodes, list):
-        return {}
-    return {
-        str(node.get("id")): node
-        for node in nodes
-        if isinstance(node, dict) and node.get("id") not in (None, "")
-    }
-
-
-def detect_structure_change_type(
-    previous_memory: Optional[Dict[str, Any]],
-    current_memory: Dict[str, Any],
-) -> List[str]:
-    """Detect structure change categories between two memory snapshots."""
-
-    if not isinstance(previous_memory, dict):
-        return ["additive"]
-
-    previous_nodes = _node_map(previous_memory)
-    current_nodes = _node_map(current_memory)
-
-    if not previous_nodes and current_nodes:
-        return ["additive"]
-
-    detected: Set[str] = set()
-
-    prev_ids = set(previous_nodes.keys())
-    curr_ids = set(current_nodes.keys())
-
-    if curr_ids - prev_ids:
-        detected.add("additive")
-
-    if prev_ids - curr_ids:
-        detected.add("delete")
-
-    for node_id in prev_ids & curr_ids:
-        previous_node = previous_nodes[node_id]
-        current_node = current_nodes[node_id]
-
-        if previous_node.get("parentId") != current_node.get("parentId"):
-            detected.add("move")
-
-        previous_name = previous_node.get("name") or previous_node.get("title")
-        current_name = current_node.get("name") or current_node.get("title")
-        if previous_name is not None and current_name is not None and previous_name != current_name:
-            detected.add("rename")
-
-    if any(
-        isinstance(node, dict) and bool(node.get("_restructure") or node.get("restructure"))
-        for node in current_memory.get("nodes", [])
-    ):
-        detected.add("restructure")
-
-    if not detected:
-        return ["additive"]
-
-    return sorted(detected)
-
-
 def validate_structure_changes(
     structure_change_types: List[str],
     *,
@@ -212,13 +146,6 @@ def validate_pipeline(
         restructure_confirmed=restructure_confirmed or bool(payload.get("restructure_confirmed")),
     )
 
-    structure_change_types = detect_structure_change_type(previous_memory, memory)
-    structure_change_errors = validate_structure_changes(
-        structure_change_types,
-        restructure_mode=restructure_mode,
-        restructure_confirmed=restructure_confirmed,
-    )
-
     return {
         "pass": len(schema_errors) == 0 and len(write_errors) == 0 and len(structure_change_errors) == 0,
         "schema_errors": schema_errors,
@@ -226,7 +153,5 @@ def validate_pipeline(
         "write_errors": write_errors,
         "structure_change_types": structure_change_types,
         "structure_change_errors": structure_change_errors,
-        "structure_change_errors": structure_change_errors,
-        "structure_change_types": structure_change_types,
         "mode": MODE,
     }
