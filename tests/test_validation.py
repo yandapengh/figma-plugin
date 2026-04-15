@@ -33,18 +33,79 @@ class ValidationPipelineTests(unittest.TestCase):
         self.assertIn("write:node_link_missing_nodeId:0", errors)
 
     def test_additive_structure_change_passes(self):
-        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
-        payload = {
+        previous = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1", "name": "Button"}]}
+        current = {
             "schemaVersion": "component@1.0.0",
-            "nodes": [{"id": "n1"}],
-            "structure_changes": [{"type": "additive"}],
+            "nodes": [{"id": "n1", "name": "Button"}, {"id": "n2", "name": "Icon"}],
         }
-        result = validate_pipeline(memory, write_payload=payload)
+        result = validate_pipeline(current, previous_memory=previous)
         self.assertTrue(result["pass"])
         self.assertEqual([], result["structure_change_errors"])
         self.assertIn("additive", result["structure_change_types"])
 
-    def test_move_change_is_blocked_by_default(self):
+    def test_move_rename_delete_blocked_by_default(self):
+        previous = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [
+                {"id": "n1", "name": "Button", "parentId": "root"},
+                {"id": "n2", "name": "Text", "parentId": "root"},
+                {"id": "n3", "name": "Icon", "parentId": "root"},
+            ],
+        }
+        current = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [
+                {"id": "n1", "name": "Button/Primary", "parentId": "root"},
+                {"id": "n2", "name": "Text", "parentId": "panel"},
+            ],
+        }
+
+        result = validate_pipeline(current, previous_memory=previous)
+
+        self.assertFalse(result["pass"])
+        self.assertIn("structure:blocked:move", result["structure_change_errors"])
+        self.assertIn("structure:blocked:rename", result["structure_change_errors"])
+        self.assertIn("structure:blocked:delete", result["structure_change_errors"])
+
+    def test_restructure_blocked_by_default(self):
+        previous = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1", "name": "Board"}]}
+        current = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1", "name": "Board", "restructure": True}],
+        }
+
+        result = validate_pipeline(current, previous_memory=previous)
+
+        self.assertFalse(result["pass"])
+        self.assertIn("restructure", result["structure_change_types"])
+        self.assertIn("structure:blocked:restructure", result["structure_change_errors"])
+
+    def test_restructure_allowed_only_with_mode_and_confirmation(self):
+        previous = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1", "name": "Board"}]}
+        current = {
+            "schemaVersion": "component@1.0.0",
+            "nodes": [{"id": "n1", "name": "Board", "restructure": True}],
+        }
+
+        result_without_confirmation = validate_pipeline(
+            current,
+            previous_memory=previous,
+            restructure_mode=True,
+            restructure_confirmed=False,
+        )
+        self.assertFalse(result_without_confirmation["pass"])
+        self.assertIn("structure:blocked:restructure", result_without_confirmation["structure_change_errors"])
+
+        result_with_confirmation = validate_pipeline(
+            current,
+            previous_memory=previous,
+            restructure_mode=True,
+            restructure_confirmed=True,
+        )
+        self.assertTrue(result_with_confirmation["pass"])
+        self.assertEqual([], result_with_confirmation["structure_change_errors"])
+
+    def test_explicit_move_change_is_blocked_by_default(self):
         memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
         payload = {
             "schemaVersion": "component@1.0.0",
@@ -53,31 +114,8 @@ class ValidationPipelineTests(unittest.TestCase):
         }
         result = validate_pipeline(memory, write_payload=payload)
         self.assertFalse(result["pass"])
-        self.assertIn("struct:blocked_change_type:move", result["structure_change_errors"])
-
-    def test_restructure_blocked_without_explicit_mode(self):
-        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
-        payload = {
-            "schemaVersion": "component@1.0.0",
-            "nodes": [{"id": "n1"}],
-            "structure_change_type": "restructure",
-        }
-        result = validate_pipeline(memory, write_payload=payload)
-        self.assertFalse(result["pass"])
-        self.assertIn("struct:blocked_change_type:restructure", result["structure_change_errors"])
-
-    def test_restructure_allowed_with_mode_and_confirmation(self):
-        memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
-        payload = {
-            "schemaVersion": "component@1.0.0",
-            "nodes": [{"id": "n1"}],
-            "structure_change_type": "restructure",
-            "restructure_mode": True,
-            "restructure_confirmed": True,
-        }
-        result = validate_pipeline(memory, write_payload=payload)
-        self.assertTrue(result["pass"])
-        self.assertEqual([], result["structure_change_errors"])
+        self.assertIn("move", result["structure_change_types"])
+        self.assertIn("structure:blocked:move", result["structure_change_errors"])
 
     def test_infer_delete_change_from_payload_keys(self):
         memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
@@ -89,7 +127,7 @@ class ValidationPipelineTests(unittest.TestCase):
         result = validate_pipeline(memory, write_payload=payload)
         self.assertFalse(result["pass"])
         self.assertIn("delete", result["structure_change_types"])
-        self.assertIn("struct:blocked_change_type:delete", result["structure_change_errors"])
+        self.assertIn("structure:blocked:delete", result["structure_change_errors"])
 
     def test_infer_additive_when_no_structure_hints(self):
         memory = {"schemaVersion": "component@1.0.0", "nodes": [{"id": "n1"}]}
