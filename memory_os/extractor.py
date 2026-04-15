@@ -33,7 +33,7 @@ def normalize_node(node: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def extract_by_schema(nodes: List[Dict[str, Any]]) -> ExtractionResult:
-    structured = {"schemaVersion": "component@1.0.0", "schema_version": "component@1.0.0", "nodes": [normalize_node(node) for node in nodes]}
+    structured = {"schemaVersion": "memory-node@1.0.0", "nodes": [normalize_node(node) for node in nodes]}
     hints: List[str] = []
 
     for node in structured["nodes"]:
